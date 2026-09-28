@@ -1,0 +1,184 @@
+<!-- <!doctype html>
+<html>
+  <head>
+    <title>Email Sender</title>
+  </head>
+  <body>
+    <h2>Email Sender</h2>
+
+    <form id="form">
+      <input
+        type="email"
+        id="to"
+        placeholder="Receiver Email"
+        required
+      /><br /><br />
+      <input
+        type="text"
+        id="subject"
+        placeholder="Subject"
+        required
+      /><br /><br />
+      <textarea id="message" placeholder="Message" required></textarea
+      ><br /><br />
+      <button type="submit">Send</button>
+    </form>
+
+    <p id="status"></p>
+
+    <script>
+      document
+        .getElementById("form")
+        .addEventListener("submit", async function (e) {
+          e.preventDefault();
+
+          const res = await fetch("/send-email", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              to: document.getElementById("to").value,
+              subject: document.getElementById("subject").value,
+              message: document.getElementById("message").value,
+            }),
+          });
+
+          const text = await res.text();
+          document.getElementById("status").innerText = text;
+        });
+    </script>
+  </body>
+</html> -->
+<!doctype html>
+<html>
+  <head>
+    <title>Email Sender</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .box {
+        background: white;
+        padding: 30px;
+        border-radius: 12px;
+        width: 300px;
+        text-align: center;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+      }
+
+      h2 {
+        margin-bottom: 20px;
+        color: #333;
+      }
+
+      input,
+      textarea {
+        width: 100%;
+        padding: 10px;
+        margin: 10px 0;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        outline: none;
+      }
+
+      input:focus,
+      textarea:focus {
+        border-color: #667eea;
+      }
+
+      button {
+        width: 100%;
+        padding: 10px;
+        background: #667eea;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 16px;
+      }
+
+      button:hover {
+        background: #5a67d8;
+      }
+
+      #status {
+        margin-top: 10px;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="box">
+      <h2>Email Sender</h2>
+
+      <form id="form" enctype="multipart/form-data">
+        <input type="file" id="file" />
+        <input
+          type="text"
+          id="to"
+          placeholder="Receiver Email (comma separated)"
+          required
+        />
+        <!-- <input type="email" id="to" placeholder="Receiver Email" required /> -->
+        <input type="text" id="subject" placeholder="Subject" required />
+        <textarea id="message" placeholder="Message" required></textarea>
+        <button type="submit">Send</button>
+      </form>
+
+      <p id="status"></p>
+    </div>
+
+    <!-- <script>
+      document
+        .getElementById("form")
+        .addEventListener("submit", async function (e) {
+          e.preventDefault();
+
+          const res = await fetch("/send-email", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              to: document.getElementById("to").value,
+              subject: document.getElementById("subject").value,
+              message: document.getElementById("message").value,
+            }),
+          });
+
+          const text = await res.text();
+          document.getElementById("status").innerText = text;
+        });
+    </script> -->
+    <script>
+      document
+        .getElementById("form")
+        .addEventListener("submit", async function (e) {
+          e.preventDefault();
+
+          const formData = new FormData();
+          formData.append("to", document.getElementById("to").value);
+          formData.append("subject", document.getElementById("subject").value);
+          formData.append("message", document.getElementById("message").value);
+          formData.append("file", document.getElementById("file").files[0]);
+
+          const res = await fetch("/send-email", {
+            method: "POST",
+            body: formData,
+          });
+
+          const text = await res.text();
+          document.getElementById("status").innerText = text;
+        });
+    </script>
+  </body>
+</html>
