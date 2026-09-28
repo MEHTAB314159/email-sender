@@ -1,169 +1,114 @@
-// const express = require("express");
-// const bodyParser = require("body-parser");
-// const cors = require("cors");
-// const dotenv = require("dotenv");
-// const sgMail = require("@sendgrid/mail");
-
-// dotenv.config();
-
-// const app = express();
-// app.use(bodyParser.json());
-// app.use(cors());
-// app.use(express.static("public"));
-
-// sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-// //
-// //
-// const fs = require("fs");
-// app.post("/send-email", async (req, res) => {
-//   const { to, subject, message } = req.body;
-
-//   const msg = {
-//     to: to,
-//     from: process.env.EMAIL_FROM,
-//     subject: subject,
-//     text: message,
-//   };
-
-//   try {
-//     await sgMail.send(msg);
-
-//     // Save history
-//     const log = `To: ${to}, Subject: ${subject}\n`;
-//     fs.appendFileSync("emails.txt", log);
-
-//     res.send("Email sent successfully!");
-//     //await sgMail.send(msg);
-//     //res.send("Email sent successfully!");
-//   } catch (error) {
-//     console.error(error);
-//     res.send("Error sending email");
-//   }
-// });
-
-// app.listen(3000, () => {
-//   console.log("Server running on http://localhost:3000");
-// });
-const multer = require("multer");
-const upload = multer({ dest: "uploads/" });
 const express = require("express");
-const bodyParser = require("body-parser");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const sgMail = require("@sendgrid/mail");
-const fs = require("fs");
+const multer = require("multer");
 
 dotenv.config();
 
 const app = express();
-app.use(bodyParser.json());
+
+// Middleware
 app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Serve frontend files
 app.use(express.static("public"));
 
+// Configure SendGrid
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
-// app.post("/send-email", async (req, res) => {
-//   const { to, subject, message } = req.body;
+// Store uploaded files in memory instead of creating uploads/.
+// This avoids the ENOENT error on Vercel.
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10 MB
+  },
+});
 
-//   const msg = {
-//     to: to,
-//     from: process.env.EMAIL_FROM,
-//     subject: subject,
-//     text: message,
-//   };
+// Home route
+app.get("/", (req, res) => {
+  res.sendFile(require("path").join(__dirname, "public", "index.html"));
+});
 
-//   try {
-//     await sgMail.send(msg);
-
-//     console.log("Email sent successfully!");
-//     console.log("Saving email history...");
-
-//     // Ensure file exists and append
-//     const log = `To: ${to}, Subject: ${subject}, Message: ${message}\n`;
-//     console.log("Saving at:", __dirname);
-//     fs.appendFileSync(__dirname + "\\emails.txt", log, { encoding: "utf8" });
-//     res.send("Email sent successfully!");
-//   } catch (error) {
-//     console.error("SendGrid Error:", error.response?.body || error.message);
-//     res.send("Error sending email");
-//   }
-// });
-// app.post("/send-email", upload.single("file"), async (req, res) => {
-//   const { to, subject, message } = req.body;
-//   const file = req.file;
-
-//   const msg = {
-//     to: to,
-//     from: process.env.EMAIL_FROM,
-//     subject: subject,
-//     text: message,
-//     attachments: [
-//       {
-//         content: require("fs").readFileSync(file.path).toString("base64"),
-//         filename: file.originalname,
-//         type: "application/pdf",
-//         disposition: "attachment",
-//       },
-//     ],
-//   };
-
-//   try {
-//     await sgMail.send(msg);
-
-//     console.log("Email sent with attachment!");
-
-//     const log = `To: ${to}, Subject: ${subject}, Message: ${message}, File: ${file.originalname}\n`;
-//     fs.appendFileSync(__dirname + "\\emails.txt", log, { encoding: "utf8" });
-
-//     res.send("Email sent with file!");
-//   } catch (error) {
-//     console.error(error);
-//     res.send("Error sending email");
-//   }
-// });
-
+// Send email with optional PDF attachment
 app.post("/send-email", upload.single("file"), async (req, res) => {
-  const { to, subject, message } = req.body;
-  const file = req.file;
-
-  let msg = {
-    to: to.split(",").map((email) => email.trim()),
-    // to: to.split(","),
-    // to: to,
-    from: process.env.EMAIL_FROM,
-    subject: subject,
-    text: message,
-  };
-
-  // 👉 If file exists, add attachment
-  if (file) {
-    msg.attachments = [
-      {
-        content: require("fs").readFileSync(file.path).toString("base64"),
-        filename: file.originalname,
-        type: "application/pdf",
-        disposition: "attachment",
-      },
-    ];
-  }
-
   try {
+    const { to, subject, message } = req.body;
+    const file = req.file;
+
+    // Validate input
+    if (!to || !subject || !message) {
+      return res
+        .status(400)
+        .send("Please enter recipient, subject, and message.");
+    }
+
+    if (!process.env.SENDGRID_API_KEY || !process.env.EMAIL_FROM) {
+      console.error("SendGrid environment variables are missing.");
+      return res
+        .status(500)
+        .send(
+          "Email service is not configured. Please contact the administrator.",
+        );
+    }
+
+    // Create email
+    const msg = {
+      to: to
+        .split(",")
+        .map((email) => email.trim())
+        .filter(Boolean),
+      from: process.env.EMAIL_FROM,
+      subject: subject,
+      text: message,
+    };
+
+    // Add attachment if a file was selected
+    if (file) {
+      msg.attachments = [
+        {
+          content: file.buffer.toString("base64"),
+          filename: file.originalname,
+          type: file.mimetype,
+          disposition: "attachment",
+        },
+      ];
+    }
+
+    // Send email through SendGrid
     await sgMail.send(msg);
 
-    console.log("Email sent!");
+    console.log("Email sent successfully!");
 
-    const log = `To: ${to}, Subject: ${subject}, Message: ${message}, File: ${file ? file.originalname : "No file"}\n`;
-    require("fs").appendFileSync(__dirname + "\\emails.txt", log, {
-      encoding: "utf8",
+    // Vercel does not provide persistent local file storage.
+    // Log basic information to Vercel logs instead.
+    console.log("Email history:", {
+      to,
+      subject,
+      file: file ? file.originalname : "No file",
     });
 
-    res.send("Email sent successfully!");
+    return res.status(200).send("Email sent successfully!");
   } catch (error) {
-    console.error(error);
-    res.send("Error sending email");
+    console.error("Email error:", error.response?.body || error.message);
+
+    return res
+      .status(500)
+      .send("Error sending email. Please check your email settings.");
   }
 });
 
-app.listen(3000, () => {
-  console.log("Server running on http://localhost:3000");
-});
+// Export the Express app for Vercel
+module.exports = app;
+
+// Run locally only
+if (require.main === module) {
+  const PORT = process.env.PORT || 3000;
+
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
